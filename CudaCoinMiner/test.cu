@@ -12,14 +12,7 @@ __global__ void findKernel(unsigned int* gpu_result) {
         *gpu_result = i;
 }
 
-int main() {
-    if (!check_sha1() || !check_sha1_2() || !check_sha1_3() || !check_sha1_4()) {
-        printf("SHA1 is not working!\n");
-        return -1;
-    }
-    else
-        printf("Checking SHA1 is successful\n");
-
+int main2() {
     unsigned int result = 0;
 
     cudaSetDevice(0);
@@ -34,4 +27,8 @@ int main() {
 
     printf("%i", result);
     cudaFree(dev_result); 
+
+    getchar();
+
+    return 1;
 }

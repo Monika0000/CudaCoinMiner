@@ -11,7 +11,6 @@
 struct sha1 {
     unsigned __int32 digest[5];
     char* buffer;
-    //char buffer[BLOCK_BYTES + 1];
     unsigned __int64 transforms;
     unsigned __int32 buff_size;
 
@@ -24,10 +23,8 @@ inline static void reset(struct sha1* _sha1){
     _sha1->digest[2] = 0x98badcfe;
     _sha1->digest[3] = 0x10325476;
     _sha1->digest[4] = 0xc3d2e1f0;
-    //if (_sha1->buffer)
-    //    free(_sha1->buffer);
-    //_sha1->buffer = NULL;
     _sha1->buffer[0] = '\0';
+
     /* Reset counters */
     _sha1->buff_size = 0;
     _sha1->transforms = 0;
@@ -35,11 +32,14 @@ inline static void reset(struct sha1* _sha1){
 
 inline static struct sha1* newSHA1() {
     struct sha1* _sha1 = (struct sha1*)malloc(sizeof(struct sha1));
-    //_sha1->buffer = NULL;
+
     _sha1->buffer = (char*)malloc(BLOCK_BYTES + 1);
+    _sha1->buffer[BLOCK_BYTES] = '\0';
+
     _sha1->block = (unsigned __int32*)malloc(BLOCK_BYTES);
-    //_sha1->buffer[0] = '\0';
+
     reset(_sha1);
+
     return _sha1;
 }
 
