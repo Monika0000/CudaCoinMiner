@@ -32,7 +32,6 @@ int main() {
 
     cudaMemcpy(&result, dev_result, sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-
     printf("%i", result);
     cudaFree(dev_result); 
 }
