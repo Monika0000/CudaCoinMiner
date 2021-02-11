@@ -75,18 +75,25 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <CodeGeneration>compute_50,sm_50</CodeGeneration>
+      <CodeGeneration>
+      </CodeGeneration>
+      <NvccCompilation>compile</NvccCompilation>
+      <FastMath>true</FastMath>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="miner.cu" />
-    <ClInclude Include="sha1.h" />
+    <ClInclude Include="miner.cu">
+      <FileType>Document</FileType>
+    </ClInclude>
+    <ClInclude Include="sha1.cu" />
     <ClInclude Include="sha1_util.h" />
-    <ClInclude Include="string_util.h" />
+    <ClInclude Include="string_util.cu" />
     <ClInclude Include="unit_test.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cu" />
+    <CudaCompile Include="main.cu">
+      <FileType>Document</FileType>
+    </CudaCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

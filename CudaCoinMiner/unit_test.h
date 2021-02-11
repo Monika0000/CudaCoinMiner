@@ -6,7 +6,7 @@
 #define COINMINER_UNIT_TEST_H
 
 #include <malloc.h>
-#include "sha1.h"
+#include "sha1.cu"
 
 inline static unsigned char check_sha1() {
     struct sha1* _sha1 = newSHA1();

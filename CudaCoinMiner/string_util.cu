@@ -5,6 +5,9 @@
 #ifndef COINMINER_STRING_UTIL_H
 #define COINMINER_STRING_UTIL_H
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "cuda_runtime.h"
 
 inline static void print_char_array(const char* str, unsigned __int32 count) {
     while (count) {
@@ -15,42 +18,19 @@ inline static void print_char_array(const char* str, unsigned __int32 count) {
 
 }
 
-inline char to16(unsigned char number) {
-    switch (number) {
-        case 0: return '0';
-        case 1: return '1';
-        case 2: return '2';
-        case 3: return '3';
-        case 4: return '4';
-        case 5: return '5';
-        case 6: return '6';
-        case 7: return '7';
-        case 8: return '8';
-        case 9: return '9';
-        case 10: return 'a';
-        case 11: return 'b';
-        case 12: return 'c';
-        case 13: return 'd';
-        case 14: return 'e';
-        case 15: return 'f';
-    }
-}
 
 //void read_to(char* out, const char* source, )
 
-void to_hex(char* hex, unsigned __int32 num) {
-    hex[7] = to16(num % 16); num /= 16;
-    hex[6] = to16(num % 16); num /= 16;
-    hex[5] = to16(num % 16); num /= 16;
-    hex[4] = to16(num % 16); num /= 16;
-
-    hex[3] = to16(num % 16); num /= 16;
-    hex[2] = to16(num % 16); num /= 16;
-    hex[1] = to16(num % 16); num /= 16;
-    hex[0] = to16(num % 16);
+inline static short fast_strlen(const char* str) {
+    unsigned short size = 0;
+    while (*str) {
+        size++;
+        str++;
+    }
+    return size;
 }
 
-inline static short fast_strlen(const char* str) {
+__device__ inline static short cuda_fast_strlen(const char* str) {
     unsigned short size = 0;
     while(*str) {
         size++;
@@ -142,6 +122,15 @@ inline static void read_string(char* out, const char* source, unsigned char coun
     }
 }
 
+__device__ inline static void cuda_read_string(char* out, const char* source, unsigned char count) {
+    while (count) {
+        *out = *source;
+        out++;
+        source++;
+        count--;
+    }
+}
+
 inline static void append(char* str, char symbol, unsigned char size, unsigned char count) {
    //realloc(str, size + count);
     /*str += size;
@@ -199,7 +188,7 @@ inline static char* read_to(const char* str, char symbol, unsigned short* id) {
     return NULL;
 }
 
-void lutHexString(unsigned __int32 x, char *s) {
+__device__ void lutHexString(unsigned __int32 x, char *s) {
     static const char digits[513] =
             "000102030405060708090a0b0c0d0e0f"
             "101112131415161718191a1b1c1d1e1f"

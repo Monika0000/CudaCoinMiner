@@ -5,8 +5,11 @@
 #ifndef COINMINER_SHA1_H
 #define COINMINER_SHA1_H
 
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
 #include "sha1_util.h"
-#include "string_util.h"
+#include "string_util.cu"
 
 struct sha1 {
     unsigned __int32 digest[5];
@@ -17,7 +20,7 @@ struct sha1 {
     unsigned __int32* block; // non copy
 };
 
-inline static void reset(struct sha1* _sha1){
+__device__ inline static void reset(struct sha1* _sha1){
     _sha1->digest[0] = 0x67452301;
     _sha1->digest[1] = 0xefcdab89;
     _sha1->digest[2] = 0x98badcfe;
@@ -30,7 +33,7 @@ inline static void reset(struct sha1* _sha1){
     _sha1->transforms = 0;
 }
 
-inline static struct sha1* newSHA1() {
+__device__ inline static struct sha1* newSHA1() {
     struct sha1* _sha1 = (struct sha1*)malloc(sizeof(struct sha1));
 
     _sha1->buffer = (char*)malloc(BLOCK_BYTES + 1);
@@ -43,14 +46,14 @@ inline static struct sha1* newSHA1() {
     return _sha1;
 }
 
-void string_copy( const char *from, char *to ) {
+__device__ void string_copy( const char *from, char *to ) {
     for ( char *p = to; ( *p = *from ) != '\0'; ++p, ++from)
     {
         ;
     }
 }
 
-inline static void copy_buffer(const char* from, char* to){
+__device__ inline static void copy_buffer(const char* from, char* to){
     to[0]  = from[0];   to[16] = from[16];      to[32] = from[32];   to[48] = from[48];
     to[1]  = from[1];   to[17] = from[17];      to[33] = from[33];   to[49] = from[49];
     to[2]  = from[2];   to[18] = from[18];      to[34] = from[34];   to[50] = from[50];
@@ -72,7 +75,7 @@ inline static void copy_buffer(const char* from, char* to){
     to[15] = from[15];  to[31] = from[31];      to[47] = from[47];   to[63] = from[63];
 }
 
-inline static void copySHA1(struct sha1* from, struct sha1* to) {
+__device__ inline static void copySHA1(struct sha1* from, struct sha1* to) {
     copy_buffer(from->buffer, to->buffer);
     to->buff_size = from->buff_size;
     to->digest[0] = from->digest[0];
@@ -84,7 +87,7 @@ inline static void copySHA1(struct sha1* from, struct sha1* to) {
 }
 
 //inline static void transform(struct sha1* sha1, unsigned __int32 block[BLOCK_INTS]){
-inline static void transform(struct sha1* sha1, unsigned __int32* block){
+__device__ inline static void transform(struct sha1* sha1, unsigned __int32* block){
     /* Copy digest[] to working vars */
     unsigned __int32 a = sha1->digest[0];
     unsigned __int32 b = sha1->digest[1];
@@ -185,7 +188,7 @@ inline static void transform(struct sha1* sha1, unsigned __int32* block){
     sha1->transforms++;
 }
 
-inline static void buffer_to_block(const char* buffer, unsigned __int32 block[BLOCK_INTS]) {
+__device__ inline static void buffer_to_block(const char* buffer, unsigned __int32 block[BLOCK_INTS]) {
     /* Convert the const char* (byte buffer) to a unsigned __int32 array (MSB) */
     for (signed int i = 0; i < BLOCK_INTS; i++) {
         block[i] = (buffer[4*i+3] & 0xff)
@@ -195,9 +198,9 @@ inline static void buffer_to_block(const char* buffer, unsigned __int32 block[BL
     }
 }
 
-inline static void update(struct sha1* sha1, const char* str) {
+__device__ inline static void update(struct sha1* sha1, const char* str) {
     unsigned short position = 0;
-    unsigned short size = fast_strlen(str);
+    unsigned short size = cuda_fast_strlen(str);
     unsigned char count = 0;
 
     while (1) {
@@ -210,11 +213,11 @@ inline static void update(struct sha1* sha1, const char* str) {
         if (sha1->buffer[0] == '\0') {
             //sha1->buffer = (char *) malloc(sizeof(char) * BLOCK_BYTES + 1);
             sha1->buff_size = count;
-            read_string(sha1->buffer, str + position, count);
+            cuda_read_string(sha1->buffer, str + position, count);
             sha1->buffer[count] = '\0';
             position += count;
         } else {
-            read_string(sha1->buffer + sha1->buff_size, str + position, count);
+            cuda_read_string(sha1->buffer + sha1->buff_size, str + position, count);
             sha1->buff_size += count;
             sha1->buffer[sha1->buff_size] = '\0';
             position += count;
@@ -237,7 +240,7 @@ inline static void update(struct sha1* sha1, const char* str) {
     }
 }
 
-inline static void final(struct sha1* sha1, char* result) {
+__device__ inline static void final(struct sha1* sha1, char* result) {
     /* Total number of hashed bits */
     unsigned __int64 total_bits = (sha1->transforms * BLOCK_BYTES + sha1->buff_size) * 8;
     // Padding
