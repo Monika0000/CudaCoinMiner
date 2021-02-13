@@ -16,23 +16,20 @@
 #include "string_util.cu"
 #include "sha1.c"
 
-#define CUDA_THREADS 512
+#define CUDA_THREADS 1024
 
 static char* username = NULL;
 
 unsigned char request_job(SOCKET sock, unsigned char diff) {
     if (!username) {
-        username = (char*)malloc(7);
-        username[0] = 'M';
-        username[1] = 'o';
-        username[2] = 'n';
-        username[3] = 'i';
-        username[4] = 'k';
-        username[5] = 'a';
-        username[6] = '\0';
+        username = (char*)malloc(3);
+        username[0] = '5';
+        username[1] = 'Q';
+        username[2] = '\0';
     }
 
     char* req = make_req(username, "EXTREME");
+    //char* req = make_req(username, NULL);
 
     if (send(sock, req, fast_strlen(req), 0) < 0) {
         printf("request_job() : failed\n");
@@ -181,8 +178,8 @@ unsigned int process_job(SOCKET sock) {
     }
 
     byte* dev_target = NULL;
-    cudaMalloc((void**)&dev_target, 41);
-    cudaMemcpy(dev_target, &target, 41, cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&dev_target, 20);
+    cudaMemcpy(dev_target, &target, 20, cudaMemcpyHostToDevice);
     cudaerror = cudaGetLastError();
     if (cudaerror != cudaSuccess) {
         printf("dev_target malloc error: %s\n", cudaGetErrorString(cudaerror));
@@ -207,12 +204,33 @@ unsigned int process_job(SOCKET sock) {
 
     cudaMemcpy(&result, dev_result, sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-    cudaFree(dev_result);
+    /*cudaFree(dev_result);
     cudaFree(dev_diff);
     cudaFree(dev_prefix);
-    cudaFree(dev_target);
-
-    printf("%i\n", result);
+    cudaFree(dev_target);*/
 
     return result;
+}
+
+void send_job(SOCKET sock, unsigned int job) {
+    char job_result[64];
+    itoa(job, job_result, 10);
+    strcat(job_result, ",,CoinMiner");
+
+    if (send(sock, job_result, fast_strlen(job_result), 0) < 0) {
+        printf("send_job() : failed\n");
+    }
+
+    char server_reply[6];
+    if ((recv(sock, server_reply, 6, 0)) == SOCKET_ERROR) {
+        printf("send_job(): recv version failed\n");
+    }
+    printf("%s - %s\n", job_result, server_reply);
+
+    server_reply[0] = '\0';
+    server_reply[1] = '\0';
+    server_reply[2] = '\0';
+    server_reply[3] = '\0';
+    server_reply[4] = '\0';
+    server_reply[5] = '\0';
 }

@@ -8,6 +8,38 @@ __device__ __constant__ unsigned int threadMax;
 #define SHA1_BLOCK_SIZE 20
 #define TRAIL 24
 
+#define R0(i) \
+    t = ROTLEFT(a, 5) + ((b & c) ^ (~b & d)) + e + ctx->k[0] + m[i]; \
+    e = d; \
+    d = c; \
+    c = ROTLEFT(b, 30); \
+    b = a; \
+    a = t; \
+
+#define R1(i) \
+    t = ROTLEFT(a, 5) + (b ^ c ^ d) + e + ctx->k[1] + m[i]; \
+    e = d; \
+    d = c; \
+    c = ROTLEFT(b, 30); \
+    b = a; \
+    a = t; \
+
+#define R2(i) \
+    t = ROTLEFT(a, 5) + ((b & c) ^ (b & d) ^ (c & d))  + e + ctx->k[2] + m[i]; \
+    e = d; \
+    d = c; \
+    c = ROTLEFT(b, 30); \
+    b = a; \
+    a = t; \
+
+#define R3(i) \
+    t = ROTLEFT(a, 5) + (b ^ c ^ d) + e + ctx->k[3] + m[i]; \
+    e = d; \
+    d = c; \
+    c = ROTLEFT(b, 30); \
+    b = a; \
+    a = t; \
+
 typedef unsigned char BYTE;             // 8-bit byte
 // typedef unsigned int WORD; // 32-bit word, change to "long" for 16-bit machines
 
@@ -37,42 +69,89 @@ __device__ void sha1_transform(SHA1_CTX *ctx, const BYTE data[])
     d = ctx->state[3];
     e = ctx->state[4];
 
-    for (i = 0; i < 20; ++i) 
-    {
-        t = ROTLEFT(a, 5) + ((b & c) ^ (~b & d)) + e + ctx->k[0] + m[i];
-        e = d;
-        d = c;
-        c = ROTLEFT(b, 30);
-        b = a;
-        a = t;
-    }
-    for ( ; i < 40; ++i) 
-    {
-        t = ROTLEFT(a, 5) + (b ^ c ^ d) + e + ctx->k[1] + m[i];
-        e = d;
-        d = c;
-        c = ROTLEFT(b, 30);
-        b = a;
-        a = t;
-    }
-    for ( ; i < 60; ++i) 
-    {
-        t = ROTLEFT(a, 5) + ((b & c) ^ (b & d) ^ (c & d))  + e + ctx->k[2] + m[i];
-        e = d;
-        d = c;
-        c = ROTLEFT(b, 30);
-        b = a;
-        a = t;
-    }
-    for ( ; i < 80; ++i) 
-    {
-        t = ROTLEFT(a, 5) + (b ^ c ^ d) + e + ctx->k[3] + m[i];
-        e = d;
-        d = c;
-        c = ROTLEFT(b, 30);
-        b = a;
-        a = t;
-    }
+    R0(0);
+    R0(1);
+    R0(2);
+    R0(3);
+    R0(4);
+    R0(5);
+    R0(6);
+    R0(7);
+    R0(8);
+    R0(9);
+    R0(10);
+    R0(11);
+    R0(12);
+    R0(13);
+    R0(14);
+    R0(15);
+    R0(16);
+    R0(17);
+    R0(18);
+    R0(19);
+
+    R1(20);
+    R1(21);
+    R1(22);
+    R1(23);
+    R1(24);
+    R1(25);
+    R1(26);
+    R1(27);
+    R1(28);
+    R1(29);
+    R1(30);
+    R1(31);
+    R1(32);
+    R1(33);
+    R1(34);
+    R1(35);
+    R1(36);
+    R1(37);
+    R1(38);
+    R1(39);
+
+    R2(40);
+    R2(41);
+    R2(42);
+    R2(43);
+    R2(44);
+    R2(45);
+    R2(46);
+    R2(47);
+    R2(48);
+    R2(49);
+    R2(50);
+    R2(51);
+    R2(52);
+    R2(53);
+    R2(54);
+    R2(55);
+    R2(56);
+    R2(57);
+    R2(58);
+    R2(59);
+
+    R3(60);
+    R3(61);
+    R3(62);
+    R3(63);
+    R3(64);
+    R3(65);
+    R3(66);
+    R3(67);
+    R3(68);
+    R3(69);
+    R3(70);
+    R3(71);
+    R3(72);
+    R3(73);
+    R3(74);
+    R3(75);
+    R3(76);
+    R3(77);
+    R3(78);
+    R3(79);
 
     ctx->state[0] += a;
     ctx->state[1] += b;
