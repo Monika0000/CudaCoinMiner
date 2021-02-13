@@ -13,8 +13,8 @@ DWORD WINAPI run_miner() {
     else
         printf("Checking SHA1 is successful\n");*/
 
-    // SOCKET sock = connect_to_server("51.15.127.80", 2811);
-    SOCKET sock = connect_to_server("51.195.65.23", 9999);
+    SOCKET sock = connect_to_server("51.15.127.80", 2811);
+    // SOCKET sock = connect_to_server("51.195.65.23", 9999);
 
     if (sock == INVALID_SOCKET)
         return -1;
@@ -57,7 +57,7 @@ DWORD WINAPI run_miner() {
 int main() {
     cudaSetDevice(1);
 
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < 4; i++) {
         CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&run_miner, NULL, 0, NULL);
     }
 
