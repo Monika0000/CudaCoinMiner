@@ -40,6 +40,13 @@ __device__ __constant__ unsigned int threadMax;
     b = a; \
     a = t; \
 
+#define REVBYTES(i) \
+    hash[i]      = (ctx->state[0] >> (24 - i * 8)) & 0x000000ff; \
+    hash[i + 4] = (ctx->state[1] >> (24 - i * 8)) & 0x000000ff; \
+    hash[i + 8] = (ctx->state[2] >> (24 - i * 8)) & 0x000000ff; \
+    hash[i + 12] = (ctx->state[3] >> (24 - i * 8)) & 0x000000ff; \
+    hash[i + 16] = (ctx->state[4] >> (24 - i * 8)) & 0x000000ff; \
+
 typedef unsigned char BYTE;             // 8-bit byte
 // typedef unsigned int WORD; // 32-bit word, change to "long" for 16-bit machines
 
@@ -228,71 +235,8 @@ __device__ void sha1_final(SHA1_CTX *ctx, BYTE hash[])
 
     // Since this implementation uses little endian byte ordering and MD uses big endian,
     // reverse all the bytes when copying the final state to the output hash.
-    for (i = 0; i < 4; ++i) 
-    {
-        hash[i]      = (ctx->state[0] >> (24 - i * 8)) & 0x000000ff;
-        hash[i + 4]  = (ctx->state[1] >> (24 - i * 8)) & 0x000000ff;
-        hash[i + 8]  = (ctx->state[2] >> (24 - i * 8)) & 0x000000ff;
-        hash[i + 12] = (ctx->state[3] >> (24 - i * 8)) & 0x000000ff;
-        hash[i + 16] = (ctx->state[4] >> (24 - i * 8)) & 0x000000ff;
-    }
+    REVBYTES(0);
+    REVBYTES(1);
+    REVBYTES(2);
+    REVBYTES(3);
 }
-
-__device__ bool check_trail(BYTE *ptr)
-{
-
-    return (ptr[19-0] == 0xff) && (ptr[19-1] == 0xff) && (ptr[19-2] == 0xff);
-}
-
-/*__global__ void run()
-{
-    int nnum =  blockIdx.x * 1024 + threadIdx.x;
-    int num;
-
-    SHA1_CTX ctx;
-    BYTE text1[] = {
-    				__PREFIX__
-                   };
-
-    BYTE buf[SHA1_BLOCK_SIZE];
-
-    BYTE alphabet[] = {
-    				   __ALPHABET__
-                      };
-
-    int k, r;
-
-    do
-    {
-        r = 0;
-        num = nnum;
-
-        for (k = 0; k < __LENGTH__; k++)
-        {
-            r = num & __MASK__;
-            text1[__PREFIXLEN__ + k] = alphabet[r];
-            num = (num >> __LOG2ALPHABET__);
-        }
-
-        sha1_init(&ctx);
-        sha1_update(&ctx, text1, __PREFIXLEN__+__LENGTH__);
-        sha1_final(&ctx, buf);
-
-        nnum += 256 * 1024;
-
-    } while ((__INVMASKFUNC__) && nnum < __MAX_ITERATIONS__);
-
-
-    if (__MASKFUNC__)
-    {
-        printf("%s\n", text1);
-        printf("%.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x\n", 
-        	buf[0], buf[1], buf[2], buf[3],
-        	buf[4], buf[5], buf[6], buf[7],
-        	buf[8], buf[9], buf[10], buf[11],
-        	buf[12], buf[13], buf[14], buf[15],
-        	buf[16], buf[17], buf[18], buf[19]
-        	);
-    }
-
-}*/

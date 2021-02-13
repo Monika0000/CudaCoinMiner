@@ -13,20 +13,43 @@ DWORD WINAPI run_miner() {
     else
         printf("Checking SHA1 is successful\n");*/
 
-    SOCKET sock = connect_to_server("51.15.127.80", 2811);
-    // SOCKET sock = connect_to_server("51.195.65.23", 9999);
+    // SOCKET sock = connect_to_server("51.15.127.80", 2811);
+    SOCKET sock = connect_to_server("51.195.65.23", 9999);
 
     if (sock == INVALID_SOCKET)
         return -1;
 
     unsigned int result = 0;
 
+    unsigned int* dev_result = NULL;
+    cudaMalloc((void**)&dev_result, sizeof(unsigned int));
+    cudaError_t cudaerror = cudaGetLastError();
+    if (cudaerror != cudaSuccess) {
+        printf("dev_result malloc error: %s\n", cudaGetErrorString(cudaerror));
+    }
+    
+    char* dev_prefix = NULL;
+    cudaMalloc((void**)&dev_prefix, 41);
+
+    byte* dev_target = NULL;
+    cudaMalloc((void**)&dev_target, 20);
+
+    unsigned int* dev_diff = NULL;
+    cudaMalloc((void**)&dev_diff, sizeof(unsigned int));
+
     while (true) {
         if (request_job(sock, 3)) {
-            result = process_job(sock);
+            result = process_job(sock, dev_result, dev_prefix, dev_target, dev_diff);
             send_job(sock, result);
         }
+        else
+            break;
     }
+
+    cudaFree(dev_result);
+    cudaFree(dev_prefix);
+    cudaFree(dev_target);
+    cudaFree(dev_diff);
 
     return 0;
 }
@@ -34,7 +57,7 @@ DWORD WINAPI run_miner() {
 int main() {
     cudaSetDevice(1);
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 16; i++) {
         CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&run_miner, NULL, 0, NULL);
     }
 
