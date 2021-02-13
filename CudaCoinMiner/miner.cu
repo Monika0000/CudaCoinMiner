@@ -33,7 +33,6 @@ unsigned char request_job(SOCKET sock, unsigned char diff) {
 
     if (send(sock, req, fast_strlen(req), 0) < 0) {
         printf("request_job() : failed\n");
-        free(req);
         return 0;
     }
     else {
@@ -138,7 +137,7 @@ __global__ void sha1Kernel(unsigned int* result, char* prefix, byte* target, uns
 }
 
 
-unsigned int process_job(SOCKET sock, unsigned int* dev_result, char* dev_prefix, byte* dev_target, unsigned int* dev_diff) {
+unsigned int process_job(SOCKET sock) {
     char buffer[100];
     int size = recv(sock, buffer, 100, 0);
     if (size == 0) {
@@ -163,32 +162,37 @@ unsigned int process_job(SOCKET sock, unsigned int* dev_result, char* dev_prefix
     //printf("%s\n%s\n%i\n", prefix, job, diff);
 
 
-    
-    
+    unsigned int* dev_result = NULL;
+    cudaMalloc((void**)&dev_result, sizeof(unsigned int));
+    cudaerror = cudaGetLastError();
+    if (cudaerror != cudaSuccess) {
+        printf("dev_result malloc error: %s\n", cudaGetErrorString(cudaerror));
+    }
 
+    char* dev_prefix = NULL;
+    cudaMalloc((void**)&dev_prefix, 41);
     cudaMemcpy(dev_prefix, prefix, 41, cudaMemcpyHostToDevice);
     cudaerror = cudaGetLastError();
     if (cudaerror != cudaSuccess) {
         printf("dev_prefix malloc error: %s\n", cudaGetErrorString(cudaerror));
     }
 
+    byte* dev_target = NULL;
+    cudaMalloc((void**)&dev_target, 20);
     cudaMemcpy(dev_target, &target, 20, cudaMemcpyHostToDevice);
     cudaerror = cudaGetLastError();
     if (cudaerror != cudaSuccess) {
         printf("dev_target malloc error: %s\n", cudaGetErrorString(cudaerror));
     }
 
+    unsigned int* dev_diff = NULL;
+    cudaMalloc((void**)&dev_diff, sizeof(unsigned int));
     cudaMemcpy(dev_diff, &diff, sizeof(unsigned int), cudaMemcpyHostToDevice);
     cudaerror = cudaGetLastError();
     if (cudaerror != cudaSuccess) {
         printf("dev_diff malloc error: %s\n", cudaGetErrorString(cudaerror));
     }
 
-    cudaMemcpy(dev_result, &result, sizeof(unsigned int), cudaMemcpyHostToDevice);
-    cudaerror = cudaGetLastError();
-    if (cudaerror != cudaSuccess) {
-        printf("dev_diff malloc error: %s\n", cudaGetErrorString(cudaerror));
-    }
 
     sha1Kernel <<<(unsigned long)((100 * diff) / CUDA_THREADS) + 1, CUDA_THREADS>>> (dev_result, dev_prefix, dev_target, dev_diff);
     cudaDeviceSynchronize();
@@ -200,8 +204,10 @@ unsigned int process_job(SOCKET sock, unsigned int* dev_result, char* dev_prefix
 
     cudaMemcpy(&result, dev_result, sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-    free(prefix);
-    free(job);
+    /*cudaFree(dev_result);
+    cudaFree(dev_diff);
+    cudaFree(dev_prefix);
+    cudaFree(dev_target);*/
 
     return result;
 }
