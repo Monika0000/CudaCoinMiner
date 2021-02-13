@@ -4,6 +4,7 @@
 #include "device_launch_parameters.h"
 
 #include <stdio.h>
+#include <stdbool.h>
 
 #pragma comment(lib,"Ws2_32.lib")
 
@@ -13,11 +14,9 @@
 #include <winsock2.h>
 
 #include "string_util.cu"
-#include "sha1.cu"
+#include "sha1.c"
 
-#define CUDA_BLOCKS 10000
 #define CUDA_THREADS 512
-#define CUDA_TOTAL_THREADS CUDA_BLOCKS * CUDA_THREADS
 
 static char* username = NULL;
 
@@ -33,16 +32,7 @@ unsigned char request_job(SOCKET sock, unsigned char diff) {
         username[6] = '\0';
     }
 
-    char* req = NULL;
-    switch (diff) {
-    case 0: req = make_req(username, "AVR\0"); break;
-    case 1: req = make_req(username, "ESP\0"); break;
-    case 2: req = make_req(username, "MEDIUM\0"); break;
-    case 3: req = make_req(username, NULL); break;
-    default:
-        printf("Unknown diff!");
-        return 0;
-    }
+    char* req = make_req(username, "EXTREME");
 
     if (send(sock, req, fast_strlen(req), 0) < 0) {
         printf("request_job() : failed\n");
@@ -98,105 +88,57 @@ SOCKET connect_to_server(char* ip, unsigned short port) {
     return s;
 }
 
-// inline function to swap two numbers
-__device__ inline void swap(char* x, char* y) {
-    char t = *x; *x = *y; *y = t;
-}
-
-// function to reverse buffer[i..j]
-__device__ char* reverse(char* buffer, int i, int j)
-{
-    while (i < j)
-        swap(&buffer[i++], &buffer[j--]);
-
-    return buffer;
-}
-
 // Iterative function to implement itoa() function in C
-__device__ char* itoa(int value, char* buffer, int base)
+__device__ char* cuda_itoa(char str[], int num)
 {
-    // invalid input
-    if (base < 2 || base > 32)
-        return buffer;
+    int i, rem, len = 0, n;
 
-    // consider absolute value of number
-    int n = abs(value);
-
-    int i = 0;
-    while (n)
+    n = num;
+    while (n != 0)
     {
-        int r = n % base;
-
-        if (r >= 10)
-            buffer[i++] = 65 + (r - 10);
-        else
-            buffer[i++] = 48 + r;
-
-        n = n / base;
+        len++;
+        n /= 10;
     }
-
-    // if number is 0
-    if (i == 0)
-        buffer[i++] = '0';
-
-    // If base is 10 and value is negative, the resulting string 
-    // is preceded with a minus sign (-)
-    // With any other base, value is always considered unsigned
-    if (value < 0 && base == 10)
-        buffer[i++] = '-';
-
-    buffer[i] = '\0'; // null terminate string
-
-    // reverse the string and return it
-    return reverse(buffer, 0, i - 1);
+    for (i = 0; i < len; i++)
+    {
+        rem = num % 10;
+        num = num / 10;
+        str[len - (i + 1)] = rem + '0';
+    }
+    str[len] = '\0';
 }
 
-__device__ int cuda_strcmp(const char* str_a, const char* str_b, unsigned len = 256) {
-    int match = 0;
-    unsigned i = 0;
-    unsigned done = 0;
-    while ((i < len) && (match == 0) && !done) {
-        if ((str_a[i] == 0) || (str_b[i] == 0)) done = 1;
-        else if (str_a[i] != str_b[i]) {
-            match = i + 1;
-            if (((int)str_a[i] - (int)str_b[i]) < 0)
-                match = 0 - (i + 1);
+__device__ int cuda_bytecmp(const byte* str_a, const byte* str_b, unsigned int len) {
+    for (int i = 0; i < len; i++) {
+        if (str_a[i] != str_b[i]) {
+            return false;
         }
-        i++;
     }
-    return match;
+    return true;
 }
 
-__global__ void sha1Kernel(unsigned int* result, char* prefix, char* target, unsigned int* diff) {
+__global__ void sha1Kernel(unsigned int* result, char* prefix, byte* target, unsigned int* diff) {
     unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int iterations_per_thread = 100 * (*diff) / CUDA_TOTAL_THREADS;
-    unsigned int from = iterations_per_thread * index - iterations_per_thread;
-    unsigned int to = 0;
-    if (index == CUDA_TOTAL_THREADS - 1) {
-        to = 100 * (*diff);
+    if (*result != 0 || index > *diff * 100) {
+        return;
     }
-    else {
-        to = iterations_per_thread * index;
-    }
-    struct sha1* sha1 = newSHA1();
-    struct sha1* sha1copy = newSHA1();
+    char buffer[32];
+    byte final_hash[20];
+    SHA1_CTX sha1;
 
-    update(sha1, prefix);
-    for (unsigned int i = from; i <= to; i++) {
-        char buffer[32];
-        char final_hash[41];
+    sha1_init(&sha1);
+    sha1_update(&sha1, (const byte*)prefix, 40);
 
-        copySHA1(sha1, sha1copy);
-        itoa(i, buffer, 10);
-        update(sha1copy, buffer);
-        final(sha1copy, final_hash);
-        if (cuda_strcmp(final_hash, target, 8) == 0 ) {
-            *result = i;
-            return;
-        }
-        reset(sha1copy);        
+    cuda_itoa(buffer, index);
+    sha1_update(&sha1, (const byte*)buffer, cuda_fast_strlen(buffer));
+
+    sha1_final(&sha1, final_hash);
+
+    if (cuda_bytecmp(final_hash, target, 10) == true) {
+        *result = index;
     }
 }
+
 
 unsigned int process_job(SOCKET sock) {
     char buffer[100];
@@ -214,8 +156,10 @@ unsigned int process_job(SOCKET sock) {
     unsigned short id = 0;
     char* prefix = read_to(buffer, ',', &id);
     char* job = read_to(buffer + id, ',', &id);
+    byte target[20];
+    hexToBytes(target, job);
     int diff = atoi(buffer + id);
-    unsigned int* result = NULL;
+    unsigned int result = 0;
     cudaError_t cudaerror;
 
     //printf("%s\n%s\n%i\n", prefix, job, diff);
@@ -236,9 +180,9 @@ unsigned int process_job(SOCKET sock) {
         printf("dev_prefix malloc error: %s\n", cudaGetErrorString(cudaerror));
     }
 
-    char* dev_target = NULL;
+    byte* dev_target = NULL;
     cudaMalloc((void**)&dev_target, 41);
-    cudaMemcpy(dev_target, &job, 41, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_target, &target, 41, cudaMemcpyHostToDevice);
     cudaerror = cudaGetLastError();
     if (cudaerror != cudaSuccess) {
         printf("dev_target malloc error: %s\n", cudaGetErrorString(cudaerror));
@@ -253,7 +197,7 @@ unsigned int process_job(SOCKET sock) {
     }
 
 
-    sha1Kernel <<<CUDA_BLOCKS, CUDA_THREADS>>> (dev_result, dev_prefix, dev_target, dev_diff);
+    sha1Kernel <<<(unsigned long)((100 * diff) / CUDA_THREADS) + 1, CUDA_THREADS>>> (dev_result, dev_prefix, dev_target, dev_diff);
     cudaDeviceSynchronize();
 
     cudaerror = cudaGetLastError();
@@ -270,5 +214,5 @@ unsigned int process_job(SOCKET sock) {
 
     printf("%i\n", result);
 
-    return 0;
+    return result;
 }

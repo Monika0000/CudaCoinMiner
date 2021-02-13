@@ -2,7 +2,6 @@
 // #include "unit_test.h"
 #include <WinSock2.h>
 #include "miner.cu"
-#include "sha1.cu"
 
 int main() {
     cudaSetDevice(0);
@@ -19,7 +18,7 @@ int main() {
         return -1;
 
     if (request_job(sock, 3)) {
-        int result = process_job(sock);
+        unsigned int result = process_job(sock);
         printf("Result: %i\n", result);
     }
 
