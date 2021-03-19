@@ -93,9 +93,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="miner.cu">
-      <FileType>Document</FileType>
+      <FileType>CppCode</FileType>
     </ClInclude>
-    <ClInclude Include="string_util.cu" />
+    <ClInclude Include="string_util.cu">
+      <FileType>CppCode</FileType>
+    </ClInclude>
     <ClInclude Include="unit_test.h" />
   </ItemGroup>
   <ItemGroup>

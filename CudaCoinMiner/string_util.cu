@@ -30,7 +30,7 @@ inline static short fast_strlen(const char* str) {
     return size;
 }
 
-__device__ inline static short cuda_fast_strlen(const char* str) {
+__device__ __forceinline__ inline static short cuda_fast_strlen(const char* str) {
     unsigned short size = 0;
     while(*str) {
         size++;
@@ -40,60 +40,25 @@ __device__ inline static short cuda_fast_strlen(const char* str) {
 }
 
 inline static char* make_req(const char* name, const char* diff) {
-    unsigned char size1 = fast_strlen(name);
+    unsigned char size = 5 + fast_strlen(name);
+    char* req = (char*)malloc(size);
+    req[size - 1] = '\0';
 
-    if (diff) {
-        unsigned char size2 = fast_strlen(diff);
-        unsigned char size_final = 5 + size1 + 1 + size2;
+    req[0] = 'J';
+    req[1] = 'O';
+    req[2] = 'B';
+    req[3] = ',';
 
-        char *req = (char *) malloc(size_final);
-        req[size_final - 1] = '\0';
 
-        req[0] = 'J';
-        req[1] = 'O';
-        req[2] = 'B';
-        req[3] = ',';
+    unsigned char pos = 4;
 
-        unsigned char pos = 4;
-
-        while (*name) {
-            req[pos] = *name;
-            name++;
-            pos++;
-        }
-
-        req[pos] = ',';
+    while (*name) {
+        req[pos] = *name;
+        name++;
         pos++;
-
-        while (*diff) {
-            req[pos] = *diff;
-            diff++;
-            pos++;
-        }
-
-        return req;
     }
-    else {
-        unsigned char size_final = 5 + size1;
-        char *req = (char *) malloc(size_final);
-        req[size_final - 1] = '\0';
 
-        req[0] = 'J';
-        req[1] = 'O';
-        req[2] = 'B';
-        req[3] = ',';
-
-
-        unsigned char pos = 4;
-
-        while (*name) {
-            req[pos] = *name;
-            name++;
-            pos++;
-        }
-
-        return req;
-    }
+    return req;
 }
 
 inline static unsigned char string_compare(const char* str1, const char* str2) {
@@ -326,5 +291,7 @@ void hexToBytes(byte* byteArray, const char* hexString)
         }
     }
 }
+
+
 
 #endif //COINMINER_STRING_UTIL_H

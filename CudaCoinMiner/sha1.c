@@ -1,15 +1,11 @@
-// Modified version of
-// https://github.com/B-Con/crypto-algorithms/blob/master/sha1.c
 #include <stdio.h>
-
-__device__ __constant__ unsigned int threadMax;
 
 #define ROTLEFT(a, b) ((a << b) | (a >> (32 - b)))
 #define SHA1_BLOCK_SIZE 20
 #define TRAIL 24
 
 #define R0(i) \
-    t = ROTLEFT(a, 5) + ((b & c) ^ (~b & d)) + e + ctx->k[0] + m[i]; \
+    t = ROTLEFT(a, 5) + ((b & c) ^ (~b & d)) + e + 0x5a827999 + m[i]; \
     e = d; \
     d = c; \
     c = ROTLEFT(b, 30); \
@@ -17,7 +13,7 @@ __device__ __constant__ unsigned int threadMax;
     a = t; \
 
 #define R1(i) \
-    t = ROTLEFT(a, 5) + (b ^ c ^ d) + e + ctx->k[1] + m[i]; \
+    t = ROTLEFT(a, 5) + (b ^ c ^ d) + e + 0x6ed9eba1 + m[i]; \
     e = d; \
     d = c; \
     c = ROTLEFT(b, 30); \
@@ -25,7 +21,7 @@ __device__ __constant__ unsigned int threadMax;
     a = t; \
 
 #define R2(i) \
-    t = ROTLEFT(a, 5) + ((b & c) ^ (b & d) ^ (c & d))  + e + ctx->k[2] + m[i]; \
+    t = ROTLEFT(a, 5) + ((b & c) ^ (b & d) ^ (c & d))  + e + 0x8f1bbcdc + m[i]; \
     e = d; \
     d = c; \
     c = ROTLEFT(b, 30); \
@@ -33,7 +29,7 @@ __device__ __constant__ unsigned int threadMax;
     a = t; \
 
 #define R3(i) \
-    t = ROTLEFT(a, 5) + (b ^ c ^ d) + e + ctx->k[3] + m[i]; \
+    t = ROTLEFT(a, 5) + (b ^ c ^ d) + e + 0xca62c1d6 + m[i]; \
     e = d; \
     d = c; \
     c = ROTLEFT(b, 30); \
@@ -42,8 +38,8 @@ __device__ __constant__ unsigned int threadMax;
 
 #define REVBYTES(i) \
     hash[i]      = (ctx->state[0] >> (24 - i * 8)) & 0x000000ff; \
-    hash[i + 4] = (ctx->state[1] >> (24 - i * 8)) & 0x000000ff; \
-    hash[i + 8] = (ctx->state[2] >> (24 - i * 8)) & 0x000000ff; \
+    hash[i + 4]  = (ctx->state[1] >> (24 - i * 8)) & 0x000000ff; \
+    hash[i + 8]  = (ctx->state[2] >> (24 - i * 8)) & 0x000000ff; \
     hash[i + 12] = (ctx->state[3] >> (24 - i * 8)) & 0x000000ff; \
     hash[i + 16] = (ctx->state[4] >> (24 - i * 8)) & 0x000000ff; \
 
@@ -52,19 +48,20 @@ typedef unsigned char BYTE;             // 8-bit byte
 
 typedef struct {
     BYTE data[64];
-    unsigned int datalen;
-    unsigned long long bitlen;
+    unsigned char datalen;
+    unsigned short bitlen;
     unsigned int state[5];
-    unsigned int k[4];
 } SHA1_CTX;
 
-
-__device__ void sha1_transform(SHA1_CTX *ctx, const BYTE data[])
+__device__ __forceinline__ void sha1_transform(SHA1_CTX *ctx, const BYTE* data)
 {
     unsigned int a, b, c, d, e, i, j, t, m[80];
 
+    #pragma unroll
     for (i = 0, j = 0; i < 16; ++i, j += 4)
         m[i] = (data[j] << 24) + (data[j + 1] << 16) + (data[j + 2] << 8) + (data[j + 3]);
+
+    #pragma unroll
     for ( ; i < 80; ++i) {
         m[i] = (m[i - 3] ^ m[i - 8] ^ m[i - 14] ^ m[i - 16]);
         m[i] = (m[i] << 1) | (m[i] >> 31);
@@ -167,7 +164,7 @@ __device__ void sha1_transform(SHA1_CTX *ctx, const BYTE data[])
     ctx->state[4] += e;
 }
 
-__device__ void sha1_init(SHA1_CTX *ctx)
+__device__ __forceinline__ void sha1_init(SHA1_CTX *ctx)
 {
     ctx->datalen = 0;
     ctx->bitlen = 0;
@@ -176,20 +173,13 @@ __device__ void sha1_init(SHA1_CTX *ctx)
     ctx->state[2] = 0x98BADCFE;
     ctx->state[3] = 0x10325476;
     ctx->state[4] = 0xc3d2e1f0;
-    ctx->k[0] = 0x5a827999;
-    ctx->k[1] = 0x6ed9eba1;
-    ctx->k[2] = 0x8f1bbcdc;
-    ctx->k[3] = 0xca62c1d6;
 }
 
-__device__ void sha1_update(SHA1_CTX *ctx, const BYTE data[], size_t len)
+__device__ __forceinline__ void sha1_update(SHA1_CTX *ctx, const BYTE* data, register const unsigned char len)
 {
-    size_t i;
-
-    for (i = 0; i < len; ++i) 
+    for (register unsigned char i = 0; i < len; ++i)
     {
-        ctx->data[ctx->datalen] = data[i];
-        ctx->datalen++;
+        ctx->data[ctx->datalen++] = data[i];
         if (ctx->datalen == 64) 
         {
             sha1_transform(ctx, ctx->data);
@@ -199,11 +189,9 @@ __device__ void sha1_update(SHA1_CTX *ctx, const BYTE data[], size_t len)
     }
 }
 
-__device__ void sha1_final(SHA1_CTX *ctx, BYTE hash[])
+__device__ __forceinline__ void sha1_final(SHA1_CTX *ctx, BYTE* hash)
 {
-    unsigned int i;
-
-    i = ctx->datalen;
+    unsigned char i = ctx->datalen;
 
     // Pad whatever data is left in the buffer.
     if (ctx->datalen < 56) 

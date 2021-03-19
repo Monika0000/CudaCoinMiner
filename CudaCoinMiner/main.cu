@@ -3,6 +3,7 @@
 #include <WinSock2.h>
 #include "miner.cu"
 
+
 DWORD WINAPI run_miner() {
     cudaSetDevice(0);
 
@@ -13,8 +14,8 @@ DWORD WINAPI run_miner() {
     else
         printf("Checking SHA1 is successful\n");*/
 
-    SOCKET sock = connect_to_server("51.15.127.80", 2811);
-    // SOCKET sock = connect_to_server("51.195.65.23", 9999);
+    // SOCKET sock = connect_to_server("51.15.127.80", 2811);
+    SOCKET sock = connect_to_server("46.101.132.213", 9999);
 
     if (sock == INVALID_SOCKET)
         return -1;
@@ -38,7 +39,7 @@ DWORD WINAPI run_miner() {
     cudaMalloc((void**)&dev_diff, sizeof(unsigned int));
 
     while (true) {
-        if (request_job(sock, 3)) {
+        if (request_job(sock)) {
             result = process_job(sock, dev_result, dev_prefix, dev_target, dev_diff);
             send_job(sock, result);
         }
@@ -54,11 +55,16 @@ DWORD WINAPI run_miner() {
     return 0;
 }
 
-int main() {
+int main(int argc, char** argv) {
+
+    if (!parse_args(argc, argv))
+        return -1;
+
     cudaSetDevice(1);
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < threads_count; i++) {
         CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&run_miner, NULL, 0, NULL);
+        Sleep(20);
     }
 
     getchar();

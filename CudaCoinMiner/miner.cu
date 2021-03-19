@@ -16,30 +16,50 @@
 #include "string_util.cu"
 #include "sha1.c"
 
-#define CUDA_THREADS 1024
+#define CUDA_THREADS 512
 
 static char* username = NULL;
+unsigned char threads_count = 0;
 
-unsigned char request_job(SOCKET sock, unsigned char diff) {
-    if (!username) {
-        username = (char*)malloc(3);
-        username[0] = '5';
-        username[1] = 'Q';
-        username[2] = '\0';
-    }
 
-    char* req = make_req(username, "EXTREME");
-    //char* req = make_req(username, NULL);
+bool request_job(SOCKET sock) {
+    //const char*
+
+    char* req = NULL;
+    req = make_req(username, NULL);
+
+    // printf("%s\n", req);
 
     if (send(sock, req, fast_strlen(req), 0) < 0) {
         printf("request_job() : failed\n");
-        free(req);
         return 0;
     }
     else {
         free(req);
         return 1;
     }
+}
+
+bool parse_args(int argc, char** argv) {
+    for (unsigned char i = 1; i < (unsigned char)argc; i += 2) {
+        if (strcmp(argv[i], "--threads") == 0) {
+            threads_count = (unsigned char)atoi(argv[i + 1]);
+            printf("Threads: %i\n", threads_count);
+        }
+        else if (strcmp(argv[i], "--user") == 0) {
+            username = argv[i + 1];
+            printf("User: %s\n", username);
+        }
+    }
+
+    if (!username) {
+        printf("parse_args(): use --user to set a username!\n");
+        return 0;
+    }
+
+    printf("parse_args(): you have %i threads\n", threads_count);
+
+    return 1;
 }
 
 SOCKET connect_to_server(char* ip, unsigned short port) {
@@ -106,13 +126,15 @@ __device__ char* cuda_itoa(char str[], int num)
     str[len] = '\0';
 }
 
-__device__ int cuda_bytecmp(const byte* str_a, const byte* str_b, unsigned int len) {
-    for (int i = 0; i < len; i++) {
-        if (str_a[i] != str_b[i]) {
-            return false;
-        }
-    }
-    return true;
+__device__ __forceinline__ int cuda_bytecmp(register const byte* s1, register const byte* s2) {
+    register unsigned char n = 11;
+    do {
+        if (*s1 != *s2++)
+            return 0;
+        if (*s1++ == 0)
+            break;
+    } while (--n != 0);
+    return 1;
 }
 
 __global__ void sha1Kernel(unsigned int* result, char* prefix, byte* target, unsigned int* diff) {
@@ -132,9 +154,10 @@ __global__ void sha1Kernel(unsigned int* result, char* prefix, byte* target, uns
 
     sha1_final(&sha1, final_hash);
 
-    if (cuda_bytecmp(final_hash, target, 10) == true) {
+    if (cuda_bytecmp(final_hash, target) == true) {
         *result = index;
     }
+
 }
 
 
@@ -160,11 +183,7 @@ unsigned int process_job(SOCKET sock, unsigned int* dev_result, char* dev_prefix
     unsigned int result = 0;
     cudaError_t cudaerror;
 
-    //printf("%s\n%s\n%i\n", prefix, job, diff);
-
-
-    
-    
+    // printf("%s\n%s\n%i\n", prefix, job, diff);
 
     cudaMemcpy(dev_prefix, prefix, 41, cudaMemcpyHostToDevice);
     cudaerror = cudaGetLastError();
@@ -195,7 +214,9 @@ unsigned int process_job(SOCKET sock, unsigned int* dev_result, char* dev_prefix
 
     cudaerror = cudaGetLastError();
     if (cudaerror != cudaSuccess) {
-        printf("sha1Kernel execution error: %s", cudaGetErrorString(cudaerror));
+        printf("sha1Kernel execution error: %s\nIt's possible that you got blocked by the server.\n", cudaGetErrorString(cudaerror));
+        closesocket(sock);
+        exit(-1);
     }
 
     cudaMemcpy(&result, dev_result, sizeof(unsigned int), cudaMemcpyDeviceToHost);
